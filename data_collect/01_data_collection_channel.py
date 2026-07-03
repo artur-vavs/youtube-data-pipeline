@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 import os
 from dotenv import load_dotenv
+from googleapiclient.discovery import build
 
 load_dotenv()
 
@@ -10,17 +11,22 @@ API_KEY = os.getenv("API_KEY")
 
 CHANNELS = ["@ingresso-com","@CNNbrasil"]
 
+youtube = build('youtube', 'v3', developerKey=API_KEY)
+# %%
 def get_chanel_data(channel):
-    params = {
-        "part": "snippet,contentDetails,statistics",
-        "forHandle": channel,
-        "key": API_KEY
-    }
-    url = "https://www.googleapis.com/youtube/v3/channels"
-    
-    return requests.get(url, params=params).json()
 
-def generate_dict_data(json):
+    
+
+    request = youtube.channels().list(
+        part='snippet,contentDetails,statistics',
+        forHandle=channel
+    )
+
+    response = request.execute()
+
+    return response
+
+def generate_channel_data(json):
 
     data_items = json['items'][0]
     data_snippet = data_items['snippet']
@@ -52,16 +58,48 @@ def generate_dataframe(dict_list: list) -> pd.DataFrame:
     df = pd.DataFrame(dict_list)
     return df
 
-# %%
-
 dict_list = []
 for channel in CHANNELS:
     data_channel = get_chanel_data(channel)
-    dict_data = generate_dict_data(data_channel)
+    dict_data = generate_channel_data(data_channel)
     dict_list.append(
     dict_data
     )
 
 df = generate_dataframe(dict_list)
-# %%
+
 df.head()
+
+# %%
+def get_playlist_videos(playlist_id):
+
+    request = youtube.playlistItems().list(
+        part='snippet,contentDetails',
+        playlistId=playlist_id,
+        maxResults=50,
+    )
+
+    response = request.execute()
+
+    return response
+
+def generate_videos_data(json):
+    video_items = json['items'][0]
+
+# %%
+json_ingresso = get_chanel_data("@ingresso-com")
+data_ingresso = generate_channel_data(json_ingresso)
+playlist_id = data_ingresso['id_playlist']
+# %%
+playlist_data = get_playlist_videos(playlist_id)
+print(playlist_data)
+# %%
+for i in playlist_data['items']:
+    print(f"publishedAt: {i['snippet']['publishedAt']} | channelId: {i['snippet']['channelId']}")
+    #print(i['snippet']['channelId'])
+    print(i['snippet']['title'])
+    print(i['snippet']['playlistId'])
+    print(i['contentDetails']['videoId'])
+    print(i['contentDetails']['videoPublishedAt'])
+
+#print(items_playlist)
