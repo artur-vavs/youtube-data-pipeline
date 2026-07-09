@@ -1,6 +1,4 @@
 # %%
-from __future__ import annotations
-
 import os
 from collections.abc import Iterable, Iterator
 from typing import Any
@@ -13,11 +11,12 @@ from googleapiclient.errors import HttpError
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-CHANNEL_HANDLES = ["@ingresso-com", "@CNNbrasil"]
+CHANNEL_HANDLES = ["@CNNbrasil"]
 
 CHANNEL_PARTS = "snippet,contentDetails,statistics"
 PLAYLIST_PARTS = "snippet,contentDetails"
 VIDEO_PARTS = "snippet,contentDetails,statistics"
+MAX_PLAYLIST_PAGES = 5
 
 
 def get_youtube_client(api_key: str | None):
@@ -79,10 +78,10 @@ def transform_channel_item(
     }
 
 
-def list_playlist_items(youtube, playlist_id: str) -> list[dict[str, Any]]:
+def list_playlist_items(youtube, playlist_id: str, max_pages: int | None = None) -> list[dict[str, Any]]:
     playlist_items: list[dict[str, Any]] = []
     next_page_token: str | None = None
-
+    current_page = 0
     while True:
         try:
             response = youtube.playlistItems().list(
@@ -97,6 +96,12 @@ def list_playlist_items(youtube, playlist_id: str) -> list[dict[str, Any]]:
             ) from exc
 
         playlist_items.extend(response.get("items", []))
+
+        current_page +=1 
+
+        if max_pages is not None and current_page >= max_pages:
+            break
+
         next_page_token = response.get("nextPageToken")
 
         if not next_page_token:
@@ -219,7 +224,7 @@ def extract_video_records(
         if not playlist_id:
             continue
 
-        playlist_items = list_playlist_items(youtube, playlist_id)
+        playlist_items = list_playlist_items(youtube, playlist_id, MAX_PLAYLIST_PAGES)
         for playlist_item in playlist_items:
             playlist_records.append(
                 transform_playlist_item(playlist_item, channel_record)
