@@ -2,7 +2,7 @@
 import os
 from collections.abc import Iterable, Iterator
 from typing import Any
-
+import fastparquet
 import pandas as pd
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -11,7 +11,7 @@ from googleapiclient.errors import HttpError
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-CHANNEL_HANDLES = ["@CNNbrasil"]
+CHANNEL_HANDLES = ["@tseries"]
 
 CHANNEL_PARTS = "snippet,contentDetails,statistics"
 PLAYLIST_PARTS = "snippet,contentDetails"
@@ -276,4 +276,5 @@ def run_channel_video_etl(
 if __name__ == "__main__":
     channels_df, videos_df = run_channel_video_etl(CHANNEL_HANDLES)
     print(channels_df.head())
-    print(videos_df.head())
+    #channels_df.to_parquet("datalake/bronze/channels_tseries.parquet", index=False)
+    #print(videos_df.head(50))
