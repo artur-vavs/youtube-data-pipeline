@@ -1,10 +1,35 @@
 services:
+  pipeline-test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    container_name: yt-watchlist-pipeline-test
+    env_file:
+      - .env
+    environment:
+      - PIPELINE_INTERVAL_MINUTES=5
+    volumes:
+      - ./datalake:/app/datalake
+      - ./config:/app/config:ro
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
     container_name: yt-watchlist-frontend
     ports:
-      - "3000:3000"
+      - "8501:8501"
+    volumes:
+      - ./datalake/gold:/app/datalake/gold:ro
+      - ./datalake/observability:/app/datalake/observability:ro
     environment:
-      - NEXT_TELEMETRY_DISABLED=1
+      - GOLD_DIR=/app/datalake/gold
+      - OBSERVABILITY_DIR=/app/datalake/observability
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped

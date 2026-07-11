@@ -1,8 +1,7 @@
-node_modules
-.next
-out
-build
-npm-debug.log*
+__pycache__
+*.py[cod]
+.pytest_cache
+.venv
 Dockerfile
 .dockerignore
 .git

@@ -1,16 +1,15 @@
-FROM node:20-alpine
+FROM python:3.13-slim
 
 WORKDIR /app
 
-# Instala as dependencias primeiro (camada cacheavel).
-COPY package.json ./
-RUN npm install
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia o restante do projeto (codigo + data/gold.json).
-COPY . .
+COPY app.py data_access.py ./
+COPY .streamlit ./.streamlit
 
-ENV NEXT_TELEMETRY_DISABLED=1
-EXPOSE 3000
+ENV GOLD_DIR=/app/datalake/gold \
+    PYTHONUNBUFFERED=1
+EXPOSE 8501
 
-# Sobe o servidor de desenvolvimento acessivel fora do container.
-CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["streamlit", "run", "app.py"]

@@ -9,10 +9,10 @@
 # ///
 
 # %%
-"""Pipeline de monitoramento diario de uma watchlist definida pelo cliente.
+"""Pipeline de monitoramento de uma watchlist definida pelo cliente.
 
 O cliente informa ate 10 canais que deseja acompanhar (o front-end futuro
-gravara essa lista em ``config/watchlists.json``). A cada execucao (6x/dia)
+gravara essa lista em ``config/watchlists.json``). A cada execucao
 coletamos um snapshot dos canais e de seus videos e cruzamos os dados para
 entregar, na camada gold:
 
@@ -29,17 +29,24 @@ Camadas (medallion):
                idempotente por chave + snapshot).
     * gold   : modelagem dimensional (fatos/dimensoes) + marts analiticos com
                as metricas derivadas.
+    * observability : historico de execucoes e chamadas da API em Parquet, com
+                      status, duracao, volumetria e erros.
 
 Concorrencia (tema da branch): cada thread processa um unico canal, constroi o
 proprio cliente (httplib2 nao e thread-safe) e grava em arquivo distinto -> sem
 disputa pelo mesmo dado nem conflito de escrita.
 """
 
+import argparse
 import json
 import os
 import re
 import shutil
+import threading
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -73,6 +80,188 @@ SILVER_DIR = DATALAKE / "silver"
 GOLD_DIR = DATALAKE / "gold"
 SILVER_CHANNELS = SILVER_DIR / "channels.parquet"
 SILVER_VIDEOS = SILVER_DIR / "videos.parquet"
+OBSERVABILITY_DIR = DATALAKE / "observability"
+PIPELINE_RUNS_PATH = OBSERVABILITY_DIR / "pipeline_runs.parquet"
+API_CALLS_PATH = OBSERVABILITY_DIR / "api_calls.parquet"
+
+
+# --------------------------------------------------------------------------- #
+# Observabilidade da execucao
+# --------------------------------------------------------------------------- #
+@dataclass
+class PipelineMetrics:
+    """Acumula metricas de uma execucao com seguranca entre threads."""
+
+    run_id: str
+    started_at: datetime
+    ingested_at: str
+    requested_channels: int = 0
+    successful_channels: int = 0
+    failed_channels: int = 0
+    successful_video_channels: int = 0
+    failed_video_channels: int = 0
+    api_calls: int = 0
+    api_errors: int = 0
+    pipeline_errors: int = 0
+    errors: list[dict[str, Any]] = field(default_factory=list)
+    api_call_log: list[dict[str, Any]] = field(default_factory=list)
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def record_channel_result(self, success: bool) -> None:
+        with self._lock:
+            if success:
+                self.successful_channels += 1
+            else:
+                self.failed_channels += 1
+
+    def record_video_result(self, success: bool) -> None:
+        with self._lock:
+            if success:
+                self.successful_video_channels += 1
+            else:
+                self.failed_video_channels += 1
+
+    def record_pipeline_error(self, stage: str, message: str) -> None:
+        with self._lock:
+            self.pipeline_errors += 1
+            self.errors.append({
+                "stage": stage,
+                "error_type": "pipeline",
+                "error_message": message[:2000],
+            })
+
+    def execute_api_request(
+        self, request: Any, endpoint: str, resource: str
+    ) -> Any:
+        """Executa uma requisicao e registra duracao/status mesmo em caso de erro."""
+        started = time.perf_counter()
+        called_at = datetime.now(timezone.utc)
+        with self._lock:
+            self.api_calls += 1
+
+        try:
+            response = request.execute()
+        except Exception as exc:
+            duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            status_code = getattr(getattr(exc, "resp", None), "status", None)
+            event = {
+                "run_id": self.run_id,
+                "called_at": called_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "endpoint": endpoint,
+                "resource": resource,
+                "status": "error",
+                "duration_ms": duration_ms,
+                "http_status": status_code,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:2000],
+            }
+            with self._lock:
+                self.api_errors += 1
+                self.api_call_log.append(event)
+                self.errors.append({
+                    "stage": endpoint,
+                    "error_type": type(exc).__name__,
+                    "error_message": f"{resource}: {str(exc)[:1900]}",
+                })
+            raise
+
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        with self._lock:
+            self.api_call_log.append({
+                "run_id": self.run_id,
+                "called_at": called_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "endpoint": endpoint,
+                "resource": resource,
+                "status": "success",
+                "duration_ms": duration_ms,
+                "http_status": 200,
+                "error_type": None,
+                "error_message": None,
+            })
+        return response
+
+    def build_run_record(
+        self,
+        finished_at: datetime,
+        status: str,
+        gold: dict[str, pd.DataFrame] | None = None,
+        fatal_error: Exception | None = None,
+    ) -> dict[str, Any]:
+        """Monta uma linha resumida para ``pipeline_runs.parquet``."""
+        with self._lock:
+            errors = list(self.errors)
+            error_count = self.pipeline_errors + self.api_errors
+
+        latest_data_at: str | None = None
+        silver_channel_rows = 0
+        silver_video_rows = 0
+        gold_rows = 0
+        if gold:
+            fact_channel = gold.get("fact_channel_stats", pd.DataFrame())
+            fact_video = gold.get("fact_video_stats", pd.DataFrame())
+            latest = fact_channel.get("ingested_at", pd.Series(dtype="datetime64[ns, UTC]")).max()
+            latest_data_at = None if pd.isna(latest) else pd.Timestamp(latest).isoformat()
+            silver_channel_rows = len(fact_channel)
+            silver_video_rows = len(fact_video)
+            gold_rows = sum(len(table) for table in gold.values())
+
+        if fatal_error:
+            errors.append({
+                "stage": "pipeline",
+                "error_type": type(fatal_error).__name__,
+                "error_message": str(fatal_error)[:2000],
+            })
+            error_count += 1
+
+        return {
+            "run_id": self.run_id,
+            "started_at": self.started_at.isoformat(),
+            "finished_at": finished_at.isoformat(),
+            "ingested_at": self.ingested_at,
+            "status": status,
+            "duration_seconds": round((finished_at - self.started_at).total_seconds(), 3),
+            "requested_channels": self.requested_channels,
+            "successful_channels": self.successful_channels,
+            "failed_channels": self.failed_channels,
+            "successful_video_channels": self.successful_video_channels,
+            "failed_video_channels": self.failed_video_channels,
+            "api_calls": self.api_calls,
+            "api_errors": self.api_errors,
+            "pipeline_errors": self.pipeline_errors,
+            "total_errors": error_count,
+            "error_message": " | ".join(
+                str(item.get("error_message", "")) for item in errors
+            )[:4000] or None,
+            "data_latest_at": latest_data_at,
+            "fact_channel_rows": silver_channel_rows,
+            "fact_video_rows": silver_video_rows,
+            "gold_rows": gold_rows,
+        }
+
+
+def _append_observability(
+    run_record: dict[str, Any], api_call_log: list[dict[str, Any]]
+) -> None:
+    """Persiste resumo e chamadas sem apagar o historico anterior."""
+    OBSERVABILITY_DIR.mkdir(parents=True, exist_ok=True)
+    run_frame = pd.DataFrame([run_record])
+    if PIPELINE_RUNS_PATH.exists():
+        run_frame = pd.concat(
+            [pd.read_parquet(PIPELINE_RUNS_PATH, engine="fastparquet"), run_frame],
+            ignore_index=True,
+        ).drop_duplicates("run_id", keep="last")
+    run_frame.to_parquet(PIPELINE_RUNS_PATH, engine="fastparquet", index=False)
+
+    if api_call_log:
+        calls_frame = pd.DataFrame(api_call_log)
+        if API_CALLS_PATH.exists():
+            calls_frame = pd.concat(
+                [pd.read_parquet(API_CALLS_PATH, engine="fastparquet"), calls_frame],
+                ignore_index=True,
+            )
+        calls_frame.to_parquet(API_CALLS_PATH, engine="fastparquet", index=False)
 
 
 # --------------------------------------------------------------------------- #
@@ -131,15 +320,22 @@ def parse_iso8601_duration(duration: str | None) -> int | None:
 # --------------------------------------------------------------------------- #
 # BRONZE -- extracao do snapshot bruto
 # --------------------------------------------------------------------------- #
-def collect_channel_bronze(task: dict[str, Any], ingested_at: str) -> dict[str, Any]:
+def collect_channel_bronze(
+    task: dict[str, Any], ingested_at: str, metrics: PipelineMetrics | None = None
+) -> dict[str, Any]:
     """Coleta 1 canal (thread) e grava o parquet bruto na bronze."""
     handle = task["channel_handle"]
     youtube = get_youtube_client(API_KEY)
     try:
-        response = youtube.channels().list(
-            part=CHANNEL_PARTS, forHandle=handle
-        ).execute()
+        request = youtube.channels().list(part=CHANNEL_PARTS, forHandle=handle)
+        response = (
+            metrics.execute_api_request(request, "channels.list", handle)
+            if metrics
+            else request.execute()
+        )
     except HttpError as exc:
+        raise RuntimeError(f"Erro ao consultar o canal {handle}: {exc}") from exc
+    except Exception as exc:
         raise RuntimeError(f"Erro ao consultar o canal {handle}: {exc}") from exc
 
     items = response.get("items", [])
@@ -175,7 +371,9 @@ def collect_channel_bronze(task: dict[str, Any], ingested_at: str) -> dict[str, 
 
 
 def collect_channel_videos_bronze(
-    channel_record: dict[str, Any], ingested_at: str
+    channel_record: dict[str, Any],
+    ingested_at: str,
+    metrics: PipelineMetrics | None = None,
 ) -> list[dict[str, Any]]:
     """Coleta os videos de 1 canal (thread) e grava o parquet bruto na bronze."""
     playlist_id = channel_record.get("uploads_playlist_id")
@@ -188,13 +386,20 @@ def collect_channel_videos_bronze(
     next_page_token: str | None = None
     for _ in range(MAX_PLAYLIST_PAGES):
         try:
-            response = youtube.playlistItems().list(
+            request = youtube.playlistItems().list(
                 part=PLAYLIST_PARTS,
                 playlistId=playlist_id,
                 maxResults=50,
                 pageToken=next_page_token,
-            ).execute()
+            )
+            response = (
+                metrics.execute_api_request(request, "playlistItems.list", playlist_id)
+                if metrics
+                else request.execute()
+            )
         except HttpError as exc:
+            raise RuntimeError(f"Erro na playlist {playlist_id}: {exc}") from exc
+        except Exception as exc:
             raise RuntimeError(f"Erro na playlist {playlist_id}: {exc}") from exc
 
         playlist_items.extend(response.get("items", []))
@@ -211,10 +416,17 @@ def collect_channel_videos_bronze(
     video_items: list[dict[str, Any]] = []
     for batch in chunked(list(playlist_by_video_id.keys()), batch_size=50):
         try:
-            response = youtube.videos().list(
+            request = youtube.videos().list(
                 part=VIDEO_PARTS, id=",".join(batch), maxResults=50
-            ).execute()
+            )
+            response = (
+                metrics.execute_api_request(request, "videos.list", channel_record["channel_id"])
+                if metrics
+                else request.execute()
+            )
         except HttpError as exc:
+            raise RuntimeError(f"Erro nos videos: {exc}") from exc
+        except Exception as exc:
             raise RuntimeError(f"Erro nos videos: {exc}") from exc
         video_items.extend(response.get("items", []))
 
@@ -253,7 +465,9 @@ def collect_channel_videos_bronze(
 
 
 def run_bronze(
-    watchlists: list[dict[str, Any]], ingested_at: str
+    watchlists: list[dict[str, Any]],
+    ingested_at: str,
+    metrics: PipelineMetrics | None = None,
 ) -> list[dict[str, Any]]:
     """Extrai o snapshot bruto de todos os canais das watchlists, em paralelo."""
     tasks: list[dict[str, Any]] = []
@@ -266,22 +480,30 @@ def run_bronze(
                 "is_owner": handle == owner,
             })
 
+    if metrics:
+        metrics.requested_channels = len(tasks)
+
     channel_records: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {
-            executor.submit(collect_channel_bronze, task, ingested_at): task
+            executor.submit(collect_channel_bronze, task, ingested_at, metrics): task
             for task in tasks
         }
         for future in as_completed(futures):
             task = futures[future]
             try:
                 channel_records.append(future.result())
+                if metrics:
+                    metrics.record_channel_result(True)
             except (RuntimeError, ValueError) as exc:
+                if metrics:
+                    metrics.record_channel_result(False)
+                    metrics.record_pipeline_error("bronze.channels", str(exc))
                 print(f"[canal falhou] {task['channel_handle']}: {exc}")
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {
-            executor.submit(collect_channel_videos_bronze, record, ingested_at):
+            executor.submit(collect_channel_videos_bronze, record, ingested_at, metrics):
                 record["channel_handle"]
             for record in channel_records
         }
@@ -289,8 +511,13 @@ def run_bronze(
             handle = futures[future]
             try:
                 count = len(future.result())
+                if metrics:
+                    metrics.record_video_result(True)
                 print(f"  videos: {handle:20} -> {count}")
             except (RuntimeError, ValueError) as exc:
+                if metrics:
+                    metrics.record_video_result(False)
+                    metrics.record_pipeline_error("bronze.videos", str(exc))
                 print(f"[videos falhou] {handle}: {exc}")
 
     return channel_records
@@ -592,23 +819,60 @@ def prepare_bronze() -> None:
         directory.mkdir(parents=True, exist_ok=True)
 
 
-def run_pipeline() -> None:
-    """Executa a pipeline completa para todas as watchlists configuradas."""
-    ingested_at = datetime.now(timezone.utc).isoformat()
-    watchlists = load_watchlists()
-    prepare_bronze()
+def run_pipeline() -> dict[str, Any]:
+    """Executa a pipeline e grava o resultado operacional em observability."""
+    started_at = datetime.now(timezone.utc)
+    ingested_at = started_at.isoformat()
+    metrics = PipelineMetrics(
+        run_id=f"{started_at.strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:8]}",
+        started_at=started_at,
+        ingested_at=ingested_at,
+    )
+    gold: dict[str, pd.DataFrame] | None = None
+    fatal_error: Exception | None = None
+    status = "error"
 
-    print(f">> BRONZE: coletando snapshot {ingested_at}...")
-    run_bronze(watchlists, ingested_at)
+    try:
+        watchlists = load_watchlists()
+        prepare_bronze()
 
-    print(">> SILVER: tratando e acumulando historico...")
-    silver_channels = build_silver_channels()
-    silver_videos = build_silver_videos()
+        print(f">> BRONZE: coletando snapshot {ingested_at}...")
+        records = run_bronze(watchlists, ingested_at, metrics)
+        if not records:
+            raise RuntimeError("Nenhum canal foi coletado com sucesso.")
 
-    print(">> GOLD: fatos, dimensoes e metricas derivadas...")
-    gold = build_gold(silver_channels, silver_videos)
+        print(">> SILVER: tratando e acumulando historico...")
+        silver_channels = build_silver_channels()
+        silver_videos = build_silver_videos()
 
-    _print_summary(gold)
+        print(">> GOLD: fatos, dimensoes e metricas derivadas...")
+        gold = build_gold(silver_channels, silver_videos)
+        status = (
+            "success"
+            if metrics.failed_channels == 0
+            and metrics.failed_video_channels == 0
+            and metrics.api_errors == 0
+            and metrics.pipeline_errors == 0
+            else "partial"
+        )
+        _print_summary(gold)
+    except Exception as exc:
+        fatal_error = exc
+        print(f"[pipeline falhou] {type(exc).__name__}: {exc}")
+    finally:
+        finished_at = datetime.now(timezone.utc)
+        run_record = metrics.build_run_record(
+            finished_at, status, gold=gold, fatal_error=fatal_error
+        )
+        try:
+            _append_observability(run_record, metrics.api_call_log)
+        except Exception as exc:
+            # A falha ao registrar telemetria nao deve esconder a falha original.
+            print(f"[observabilidade falhou] {type(exc).__name__}: {exc}")
+
+    if fatal_error:
+        raise fatal_error
+    return run_record
 
 
 def _print_summary(gold: dict[str, pd.DataFrame]) -> None:
@@ -629,6 +893,45 @@ def _print_summary(gold: dict[str, pd.DataFrame]) -> None:
         print(f"gold.{name:22}: {len(table)} linhas")
 
 
+def run_scheduler(interval_minutes: float) -> None:
+    """Repete a pipeline em intervalo fixo, mantendo o processo vivo para testes."""
+    if interval_minutes <= 0:
+        raise ValueError("O intervalo deve ser maior que zero minutos.")
+
+    interval_seconds = interval_minutes * 60
+    print(f">> Modo agendado ativo: nova execução a cada {interval_minutes:g} minuto(s).")
+    while True:
+        cycle_started = time.perf_counter()
+        try:
+            run_pipeline()
+        except Exception as exc:
+            # A execução já foi registrada como error; o scheduler continua para
+            # permitir que a próxima tentativa se recupere automaticamente.
+            print(f"[scheduler] execução encerrada com erro: {type(exc).__name__}: {exc}")
+
+        elapsed = time.perf_counter() - cycle_started
+        wait_seconds = max(0.0, interval_seconds - elapsed)
+        print(f">> Próxima execução em {wait_seconds / 60:.2f} minuto(s).")
+        time.sleep(wait_seconds)
+
+
 # %%
 if __name__ == "__main__":
-    run_pipeline()
+    parser = argparse.ArgumentParser(description="Executa o pipeline de Channel Analytics.")
+    parser.add_argument(
+        "--interval-minutes",
+        type=float,
+        default=None,
+        help="Repete a pipeline neste intervalo; omitido executa somente uma vez.",
+    )
+    args = parser.parse_args()
+    configured_interval = os.getenv("PIPELINE_INTERVAL_MINUTES")
+    interval_minutes = (
+        args.interval_minutes
+        if args.interval_minutes is not None
+        else float(configured_interval) if configured_interval else None
+    )
+    if interval_minutes is None:
+        run_pipeline()
+    else:
+        run_scheduler(interval_minutes)

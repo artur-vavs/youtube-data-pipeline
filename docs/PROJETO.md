@@ -51,7 +51,8 @@ front-end para análise histórica e comparativa de canais.
 ### Fonte de dados
 
 - Canais do YouTube, vídeos dos canais e playlists.
-- **Frequência de ingestão:** 1x ao dia.
+- **Frequência de ingestão:** configurável; o modo de teste executa a cada 5
+  minutos através do perfil `test` do Docker Compose.
 - **Métrica principal:** análise temporal de dados-chave.
 - **Perguntas analíticas:** crescimento diário, projeção de monetização e
   frequência de inscritos.
@@ -73,3 +74,15 @@ front-end para análise histórica e comparativa de canais.
 
 - API sem cota disponível.
 
+### Observabilidade
+
+Cada execução registra uma trilha operacional em `datalake/observability`:
+
+- `pipeline_runs.parquet`: status (`success`, `partial` ou `error`), início/fim,
+  duração, canais processados, chamadas/erros da API e volumetria produzida;
+- `api_calls.parquet`: endpoint, recurso, latência, status HTTP e mensagem das
+  chamadas que falharam.
+
+Esses dados são consultados na aba **Observabilidade** do frontend Streamlit,
+permitindo identificar a última execução, a última atualização efetiva dos dados
+e o motivo de falhas sem depender exclusivamente do log do processo.

@@ -1,0 +1,4 @@
+fastparquet>=2024.11
+google-api-python-client>=2.198.0
+python-dotenv>=1.2.2
+pandas>=3.0.0
