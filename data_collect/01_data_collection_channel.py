@@ -1,3 +1,12 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "fastparquet>=2026.5.0",
+#     "google-api-python-client>=2.198.0",
+#     "python-dotenv>=1.2.2",
+# ]
+# ///
+
 # %%
 import os
 from collections.abc import Iterable, Iterator

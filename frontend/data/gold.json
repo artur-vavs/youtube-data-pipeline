@@ -1,0 +1,335 @@
+{
+  "generated_at": "2026-07-10T23:10:25.895256+00:00",
+  "clients": [
+    {
+      "client_id": 1,
+      "client_name": "demo_creator_br",
+      "owner_handle": "@FelipeNeto"
+    }
+  ],
+  "channels": [
+    {
+      "channel_id": "UCX6OQ3DkcsbYNE6H8uQQuVA",
+      "client_id": 1,
+      "title": "MrBeast",
+      "handle": "@MrBeast",
+      "country": "US",
+      "published_at": "2012-02-20T00:43:50+00:00",
+      "rank": 1,
+      "is_top5": true,
+      "is_owner": false,
+      "subscriber_count": 507000000,
+      "view_count": 132933157855,
+      "video_count": 992,
+      "engagement_rate": 0.01426,
+      "videos_per_week": 2.15,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "permaneceu"
+    },
+    {
+      "channel_id": "UCq-Fj5jknLsUf-MWSy4_brA",
+      "client_id": 1,
+      "title": "T-Series",
+      "handle": "@tseries",
+      "country": "IN",
+      "published_at": "2006-03-13T14:27:05+00:00",
+      "rank": 2,
+      "is_top5": true,
+      "is_owner": false,
+      "subscriber_count": 313000000,
+      "view_count": 347925937997,
+      "video_count": 26619,
+      "engagement_rate": 0.01033,
+      "videos_per_week": 70.0,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "permaneceu"
+    },
+    {
+      "channel_id": "UC-lHJZR3Gqxm24_Vd_AJ5Yw",
+      "client_id": 1,
+      "title": "PewDiePie",
+      "handle": "@PewDiePie",
+      "country": "JP",
+      "published_at": "2010-04-29T10:54:00+00:00",
+      "rank": 3,
+      "is_top5": true,
+      "is_owner": false,
+      "subscriber_count": 110000000,
+      "view_count": 29503691587,
+      "video_count": 4664,
+      "engagement_rate": 0.06185,
+      "videos_per_week": 0.57,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "permaneceu"
+    },
+    {
+      "channel_id": "UCffDXn7ycAzwL2LDlbyWOTw",
+      "client_id": 1,
+      "title": "Canal KondZilla",
+      "handle": "@kondzilla",
+      "country": "BR",
+      "published_at": "2012-03-21T23:40:47+00:00",
+      "rank": 4,
+      "is_top5": true,
+      "is_owner": false,
+      "subscriber_count": 68200000,
+      "view_count": 40569304671,
+      "video_count": 3627,
+      "engagement_rate": 0.01399,
+      "videos_per_week": 5.93,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "permaneceu"
+    },
+    {
+      "channel_id": "UCV306eHqgo0LvBf3Mh36AHg",
+      "client_id": 1,
+      "title": "Felipe Neto",
+      "handle": "@FelipeNeto",
+      "country": "BR",
+      "published_at": "2006-05-16T06:56:06+00:00",
+      "rank": 5,
+      "is_top5": true,
+      "is_owner": true,
+      "subscriber_count": 48000000,
+      "view_count": 19660086564,
+      "video_count": 6426,
+      "engagement_rate": 0.07131,
+      "videos_per_week": 10.45,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "permaneceu"
+    },
+    {
+      "channel_id": "UCEWHPFNilsT0IfQfutVzsag",
+      "client_id": 1,
+      "title": "Porta dos Fundos",
+      "handle": "@portadosfundos",
+      "country": "BR",
+      "published_at": "2012-03-12T04:30:27+00:00",
+      "rank": 6,
+      "is_top5": false,
+      "is_owner": false,
+      "subscriber_count": 19100000,
+      "view_count": 9440686963,
+      "video_count": 3674,
+      "engagement_rate": 0.07574,
+      "videos_per_week": 13.46,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "fora"
+    },
+    {
+      "channel_id": "UCuxfOdbKQy0tgGXcm9sjHiw",
+      "client_id": 1,
+      "title": "Coisa de Nerd",
+      "handle": "@coisadenerd",
+      "country": "BR",
+      "published_at": "2009-11-05T13:23:43+00:00",
+      "rank": 7,
+      "is_top5": false,
+      "is_owner": false,
+      "subscriber_count": 11100000,
+      "view_count": 3590179596,
+      "video_count": 2014,
+      "engagement_rate": 0.08931,
+      "videos_per_week": 0.33,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "fora"
+    },
+    {
+      "channel_id": "UCFjrDmEnxrG5TRGVO0TPHLA",
+      "client_id": 1,
+      "title": "Desimpedidos",
+      "handle": "@Desimpedidos",
+      "country": "BR",
+      "published_at": "2013-06-12T17:35:28+00:00",
+      "rank": 8,
+      "is_top5": false,
+      "is_owner": false,
+      "subscriber_count": 10100000,
+      "view_count": 2448200945,
+      "video_count": 5229,
+      "engagement_rate": 0.06913,
+      "videos_per_week": 13.73,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "fora"
+    },
+    {
+      "channel_id": "UCU7uY3wCPh9j39KXzOpqNaw",
+      "client_id": 1,
+      "title": "Julio Cocielo",
+      "handle": "@cocielo",
+      "country": "UNKNOWN",
+      "published_at": "2014-09-28T06:32:59+00:00",
+      "rank": 9,
+      "is_top5": false,
+      "is_owner": false,
+      "subscriber_count": 8000000,
+      "view_count": 794373755,
+      "video_count": 534,
+      "engagement_rate": 0.0643,
+      "videos_per_week": 3.17,
+      "delta_subscribers": 0,
+      "delta_views": 0,
+      "rank_delta": 0,
+      "movement": "estavel",
+      "status_top5": "fora"
+    }
+  ],
+  "series": {
+    "snapshots": [
+      "2026-07-10T23:09:00.323063+00:00",
+      "2026-07-10T23:10:25.895256+00:00"
+    ],
+    "by_channel": {
+      "UC-lHJZR3Gqxm24_Vd_AJ5Yw": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 110000000,
+          "view_count": 29503691587,
+          "rank": 3
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 110000000,
+          "view_count": 29503691587,
+          "rank": 3
+        }
+      ],
+      "UCEWHPFNilsT0IfQfutVzsag": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 19100000,
+          "view_count": 9440686963,
+          "rank": 6
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 19100000,
+          "view_count": 9440686963,
+          "rank": 6
+        }
+      ],
+      "UCFjrDmEnxrG5TRGVO0TPHLA": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 10100000,
+          "view_count": 2448200945,
+          "rank": 8
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 10100000,
+          "view_count": 2448200945,
+          "rank": 8
+        }
+      ],
+      "UCU7uY3wCPh9j39KXzOpqNaw": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 8000000,
+          "view_count": 794373755,
+          "rank": 9
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 8000000,
+          "view_count": 794373755,
+          "rank": 9
+        }
+      ],
+      "UCV306eHqgo0LvBf3Mh36AHg": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 48000000,
+          "view_count": 19660086564,
+          "rank": 5
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 48000000,
+          "view_count": 19660086564,
+          "rank": 5
+        }
+      ],
+      "UCX6OQ3DkcsbYNE6H8uQQuVA": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 507000000,
+          "view_count": 132933157855,
+          "rank": 1
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 507000000,
+          "view_count": 132933157855,
+          "rank": 1
+        }
+      ],
+      "UCffDXn7ycAzwL2LDlbyWOTw": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 68200000,
+          "view_count": 40569304671,
+          "rank": 4
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 68200000,
+          "view_count": 40569304671,
+          "rank": 4
+        }
+      ],
+      "UCq-Fj5jknLsUf-MWSy4_brA": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 313000000,
+          "view_count": 347925937997,
+          "rank": 2
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 313000000,
+          "view_count": 347925937997,
+          "rank": 2
+        }
+      ],
+      "UCuxfOdbKQy0tgGXcm9sjHiw": [
+        {
+          "ingested_at": "2026-07-10T23:09:00.323063+00:00",
+          "subscriber_count": 11100000,
+          "view_count": 3590179596,
+          "rank": 7
+        },
+        {
+          "ingested_at": "2026-07-10T23:10:25.895256+00:00",
+          "subscriber_count": 11100000,
+          "view_count": 3590179596,
+          "rank": 7
+        }
+      ]
+    }
+  }
+}

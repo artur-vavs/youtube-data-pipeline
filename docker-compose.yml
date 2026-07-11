@@ -1,0 +1,10 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: yt-watchlist-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_TELEMETRY_DISABLED=1
+    restart: unless-stopped
