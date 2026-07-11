@@ -637,10 +637,61 @@ def _status_top5(is_top5: bool, was_top5: Any) -> str:
     return "permaneceu" if is_top5 else "fora"
 
 
+def _canonicalize_channel_clients(
+    silver_channels: pd.DataFrame, silver_videos: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Mantém o histórico quando o nome/cliente da watchlist é renomeado.
+
+    ``client_name`` é um atributo da configuração e pode mudar. O ``channel_id``
+    retornado pela API é estável, então o cliente mais recente associado a cada
+    canal é aplicado também aos snapshots antigos antes de montar a gold.
+    """
+    if silver_channels.empty:
+        return silver_channels, silver_videos
+
+    latest_by_channel = (
+        silver_channels.sort_values("ingested_at")
+        .drop_duplicates(subset=["channel_id"], keep="last")
+        .set_index("channel_id")
+    )
+    latest_client_by_channel = latest_by_channel["client_name"]
+    latest_owner_by_channel = latest_by_channel["is_owner"]
+
+    channels = silver_channels.copy()
+    channels["client_name"] = (
+        channels["channel_id"].map(latest_client_by_channel)
+        .fillna(channels["client_name"])
+    )
+    channels["is_owner"] = (
+        channels["channel_id"].map(latest_owner_by_channel)
+        .fillna(channels["is_owner"])
+    )
+    channels = channels.drop_duplicates(
+        subset=["client_name", "channel_id", "ingested_at"], keep="last"
+    )
+
+    videos = silver_videos.copy()
+    if not videos.empty:
+        videos["client_name"] = (
+            videos["channel_id"].map(latest_client_by_channel)
+            .fillna(videos["client_name"])
+        )
+        videos = videos.drop_duplicates(
+            subset=["client_name", "channel_id", "video_id", "ingested_at"],
+            keep="last",
+        )
+    return channels, videos
+
+
 def build_gold(
     silver_channels: pd.DataFrame, silver_videos: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
     """Monta dimensoes, fatos (serie temporal) e marts com metricas derivadas."""
+    # Permite trocar ``cliente``/``meu_canal`` sem romper a série histórica dos
+    # canais que continuam na watchlist atual.
+    silver_channels, silver_videos = _canonicalize_channel_clients(
+        silver_channels, silver_videos
+    )
     tables: dict[str, pd.DataFrame] = {}
 
     # ---- Dimensao: cliente ----

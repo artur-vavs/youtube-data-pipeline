@@ -2,10 +2,11 @@
   "_comment": "Contrato de entrada da pipeline. Sera gerado pelo front-end futuramente. Cada cliente monitora ate 10 canais; 'meu_canal' e o canal do proprio cliente e deve estar tambem em 'canais'.",
   "clientes": [
     {
-      "cliente": "demo_creator_br",
-      "meu_canal": "@FelipeNeto",
+      "cliente": "@teomewhy",
+      "meu_canal": "@teomewhy",
       "canais": [
-        "@FelipeNeto",
+        "@teomewhy",
+        "@BaianoTV1",
         "@portadosfundos",
         "@cocielo",
         "@kondzilla",
