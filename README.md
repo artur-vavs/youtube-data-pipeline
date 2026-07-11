@@ -1,22 +1,74 @@
-# YouTube Analytics Pipeline
+# Channel Analytics
 
-Este projeto tem como objetivo desenvolver uma pipeline de Engenharia de Dados para coleta, processamento e análise de dados da API do YouTube. A solução realiza a extração de informações de canais monitorados, identifica todos os vídeos publicados por meio da playlist de uploads de cada canal e coleta métricas como visualizações, curtidas, comentários, duração e data de publicação.
+Pipeline de dados do YouTube com arquitetura medallion (bronze → silver → gold) e
+front-end para análise histórica e comparativa de canais.
 
-Os dados extraídos são estruturados em um formato analítico para possibilitar a construção de dashboards, rankings e indicadores de desempenho dos canais e vídeos ao longo do tempo. A arquitetura do projeto foi concebida para evoluir para cargas incrementais, armazenamento em banco de dados e monitoramento contínuo das métricas, simulando um cenário real de Engenharia de Dados.
+## Premissa
 
-## Tecnologias
+- Coletar dados de canais pré-definidos de categorias como **esporte**,
+  **entretenimento** e **games**, através do *handle* do canal.
+- Armazenar uma carga inicial por canal na camada **bronze** — cada canal tem o
+  seu próprio arquivo parquet.
+- Na camada **silver**, aplicar **idempotência** para acompanhar o crescimento do
+  canal a cada chamada (6 chamadas por dia, a cada 4 horas). Capturamos métricas
+  como `view_count`, `subscriber_count`, `like_count`, `comment_count`, entre
+  outras — tanto dos vídeos quanto do próprio canal.
+- Na camada **gold**, montar a camada analítica desses dados.
 
-* Python
-* YouTube Data API v3
-* Pandas
-* Requests
-* SQL (futuro)
-* Power BI (futuro)
+---
 
-## Objetivos
+## 3.1 Identidade
 
-* Automatizar a coleta de dados da API do YouTube.
-* Construir uma pipeline de ingestão e transformação de dados.
-* Gerar uma base analítica para consultas e visualizações.
-* Aplicar conceitos de ETL/ELT, modelagem de dados e cargas incrementais.
-* Disponibilizar informações para análise de desempenho de canais e vídeos.
+- **Nome do projeto:** Channel Analytics
+- **Tema:** Tema 11 — União de todos os temas (Top 5 de cada tema)
+- **Data de início:** 09/07/2026
+
+### Equipe
+
+- Hemersson do Vale
+- Alan Pacheco
+- Artur Vinicius
+
+---
+
+## 3.2 Problema e Propósito
+
+- **Problema:** falta de acesso, pelo público, a dados analíticos e históricos
+  dos canais mais bem rankeados do YouTube.
+- **Propósito:** fornecer uma análise histórica e temporal dos maiores canais —
+  total de views, contagem de inscritos e vídeos publicados.
+- **Público-alvo:** consumidores de grandes canais do YouTube e pessoas que
+  pretendem abrir um canal e querem se basear nos dados dos seus canais favoritos
+  ou de referência.
+- **Hipótese de valor:** ao seguir os passos de um canal modelo, é possível obter
+  um impulso mais rápido de views e inscritos, viabilizando uma monetização mais
+  ágil.
+
+---
+
+## 3.3 Escopo Técnico
+
+### Fonte de dados
+
+- Canais do YouTube, vídeos dos canais e playlists.
+- **Frequência de ingestão:** 1x ao dia.
+- **Métrica principal:** análise temporal de dados-chave.
+- **Perguntas analíticas:** crescimento diário, projeção de monetização e
+  frequência de inscritos.
+
+### Fora do escopo
+
+- Análises estatísticas aprofundadas.
+- Front end muito aprimorado
+
+---
+
+## 3.4 Critério de Sucesso
+
+### Definição de pronto
+
+- Visualização dos dados em um front-end.
+
+### Riscos
+
+- API sem cota disponível.
