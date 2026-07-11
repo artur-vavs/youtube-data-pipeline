@@ -1,0 +1,39 @@
+# Compose de PRODUÇÃO para deploy na VPS via Coolify (não altera o docker-compose.yml de dev).
+# No Coolify, aponte "Compose file location" para este arquivo.
+#   pipeline  -> monitor perene da watchlist (a cada 4h), ESCREVE no datalake
+#   frontend  -> dashboard Streamlit, LÊ o datalake, publicado no subdomínio
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    command: python data_collect/04_pipeline_watchlist_monitor.py --interval-minutes 240
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - datalake:/app/datalake
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      GOLD_DIR: /app/datalake/gold
+      OBSERVABILITY_DIR: /app/datalake/observability
+    volumes:
+      - datalake:/app/datalake:ro
+    expose:
+      - "8501"
+    depends_on:
+      - pipeline
+    restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  datalake:
