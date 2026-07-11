@@ -10,4 +10,4 @@ COPY config ./config
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "data_collect/04_pipeline_watchlist_monitor.py", "--interval-minutes", "5"]
+CMD ["python", "data_collect/04_pipeline_watchlist_monitor.py"]
