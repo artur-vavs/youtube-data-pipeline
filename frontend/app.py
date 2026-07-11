@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timezone
+import os
 
 import altair as alt
 import pandas as pd
@@ -82,7 +82,7 @@ def cached_observability() -> dict[str, pd.DataFrame]:
 
 
 def render_header(snapshot_at: pd.Timestamp, client_name: str, channel_count: int) -> None:
-    local_time = snapshot_at.tz_convert(timezone.utc).strftime("%d/%m/%Y às %H:%M UTC")
+    local_time = snapshot_at.strftime("%d/%m/%Y às %H:%M (Fortaleza)")
     st.markdown('<p class="eyebrow">YOUTUBE · WATCHLIST ANALYTICS</p>', unsafe_allow_html=True)
     st.title("Compare seu canal com quem disputa a atenção da sua audiência")
     st.caption(f"{client_name} · {channel_count} canais monitorados · snapshot de {local_time}")
@@ -95,7 +95,9 @@ def render_kpis(selected: pd.Series, total: int) -> None:
     rank_delta, rank_color = delta(selected.get("rank_delta"))
     cols[0].metric("Inscritos", compact(selected.get("subscriber_count")), subscriber_delta, delta_color=subscriber_color)
     cols[1].metric("Visualizações", compact(selected.get("view_count")), view_delta, delta_color=view_color)
-    cols[2].metric("Posição", f"#{int(selected['rank'])} de {total}", rank_delta, delta_color=rank_color)
+    rank = selected.get("rank")
+    position = f"#{int(rank)} de {total}" if pd.notna(rank) else f"— de {total}"
+    cols[2].metric("Posição", position, rank_delta, delta_color=rank_color)
     cols[3].metric("Engajamento", percent(selected.get("engagement_rate")))
     cadence = selected.get("videos_per_week")
     cols[4].metric("Cadência", "—" if pd.isna(cadence) else f"{cadence:.1f}/sem")
@@ -157,26 +159,31 @@ def history_tab(history: pd.DataFrame) -> None:
         format_func=metric_labels.get,
         default="subscriber_count",
     )
-    chart = (
+    line = (
         alt.Chart(history.dropna(subset=[metric]))
-        .mark_line(point=True, strokeWidth=2.5)
+        .mark_line(point=True, strokeWidth=2)
         .encode(
-            x=alt.X("ingested_at:T", title="Snapshot"),
+            x=alt.X("ingested_at:T", title=None, axis=alt.Axis(format="%d/%m %H:%M")),
             y=alt.Y(
                 f"{metric}:Q",
-                title=metric_labels[metric],
+                title=None,
                 scale=alt.Scale(reverse=metric == "rank", zero=False),
             ),
-            color=alt.Color("channel_title:N", title="Canal"),
+            color=alt.Color("channel_title:N", legend=None),
             tooltip=[
                 alt.Tooltip("channel_title:N", title="Canal"),
                 alt.Tooltip("ingested_at:T", title="Data", format="%d/%m/%Y %H:%M"),
                 alt.Tooltip(f"{metric}:Q", title=metric_labels[metric], format=","),
             ],
         )
-        .properties(height=440)
+        .properties(height=200)
     )
+    # Um painel por canal com eixo Y proprio: variacoes pequenas ficam visiveis.
+    chart = line.facet(facet=alt.Facet("channel_title:N", title=None), columns=2)
+    chart = chart.resolve_scale(y="independent")
     st.altair_chart(chart, width="stretch")
+    if metric == "subscriber_count":
+        st.caption("O YouTube arredonda o número de inscritos; por isso a variação de curto prazo aparece constante.")
     if history["ingested_at"].nunique() < 2:
         st.caption("A série possui apenas um snapshot. Novos pontos aparecerão após as próximas execuções da pipeline.")
 
@@ -280,7 +287,7 @@ def ranking_tab(snapshot: pd.DataFrame, selected_id: str) -> None:
 def _display_timestamp(value: object) -> str:
     if value is None or pd.isna(value):
         return "—"
-    return pd.Timestamp(value).strftime("%d/%m/%Y %H:%M:%S UTC")
+    return pd.Timestamp(value).strftime("%d/%m/%Y %H:%M:%S (Fortaleza)")
 
 
 def observability_tab(observability: dict[str, pd.DataFrame]) -> None:
@@ -316,15 +323,24 @@ def observability_tab(observability: dict[str, pd.DataFrame]) -> None:
     else:
         st.error("A última execução terminou com erro. O snapshot desta execução não deve ser considerado completo.")
 
+    # Proxima execucao = inicio + cadencia real (mediana dos intervalos entre runs).
+    cadence = pd.Timedelta(minutes=float(os.getenv("PIPELINE_INTERVAL_MINUTES", "240")))
+    if "started_at" in runs:
+        starts = runs["started_at"].dropna().sort_values()
+        if len(starts) >= 2:
+            cadence = starts.diff().median()
+        runs["next_run_at"] = (runs["started_at"] + cadence).dt.strftime("%d/%m/%Y %H:%M")
+
     st.subheader("Histórico de execuções")
     run_columns = [
-        "finished_at", "status", "duration_seconds", "requested_channels",
+        "finished_at", "next_run_at", "status", "duration_seconds", "requested_channels",
         "successful_channels", "failed_channels", "api_calls", "api_errors",
         "gold_rows", "error_message",
     ]
     run_columns = [column for column in run_columns if column in runs]
     run_view = runs.tail(20)[run_columns].sort_values("finished_at", ascending=False).rename(columns={
-        "finished_at": "Finalizada em", "status": "Status", "duration_seconds": "Duração (s)",
+        "finished_at": "Finalizada em", "next_run_at": "Próxima execução",
+        "status": "Status", "duration_seconds": "Duração (s)",
         "requested_channels": "Canais solicitados", "successful_channels": "Canais OK",
         "failed_channels": "Canais com erro", "api_calls": "Chamadas API", "api_errors": "Erros API",
         "gold_rows": "Linhas gold", "error_message": "Resumo dos erros",
@@ -378,8 +394,8 @@ def main() -> None:
     st.markdown(
         """
         <style>
-        .block-container {padding-top: 2rem; padding-bottom: 4rem; max-width: 1440px;}
-        .eyebrow {font-size:.74rem; letter-spacing:.12em; color:#ff4b4b; font-weight:700; margin-bottom:-.5rem;}
+        .block-container {padding-top: 3.5rem; padding-bottom: 4rem; max-width: 1440px;}
+        .eyebrow {font-size:.74rem; letter-spacing:.12em; color:#ff4b4b; font-weight:700; line-height:1.6; margin:0 0 -.2rem;}
         [data-testid="stMetric"] {border:1px solid rgba(128,128,128,.20); border-radius:12px; padding:1rem;}
         [data-testid="stMetricValue"] {font-size:1.65rem;}
         div[data-testid="stSidebarContent"] {padding-top:1.2rem;}

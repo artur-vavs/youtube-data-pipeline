@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 import os
+from datetime import timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
+
+FORTALEZA = timezone(timedelta(hours=-3))  # UTC-3, fuso de Fortaleza/CE
+
+
+def to_fortaleza(values: pd.Series) -> pd.Series:
+    """Converte timestamps UTC para o horário de Fortaleza (sem fuso, p/ exibir)."""
+    parsed = pd.to_datetime(values, errors="coerce", utc=True)
+    return parsed.dt.tz_convert(FORTALEZA).dt.tz_localize(None)
 
 
 DEFAULT_GOLD_DIR = Path(__file__).resolve().parents[1] / "datalake" / "gold"
@@ -40,15 +49,10 @@ def load_observability(
     for name in ("pipeline_runs", "api_calls"):
         file = source / f"{name}.parquet"
         tables[name] = pd.read_parquet(file) if file.exists() else pd.DataFrame()
-        if "ingested_at" in tables[name]:
-            tables[name]["ingested_at"] = pd.to_datetime(
-                tables[name]["ingested_at"], errors="coerce", utc=True
-            )
-        for column in ("started_at", "finished_at", "called_at"):
+        time_columns = ("ingested_at", "started_at", "finished_at", "called_at", "data_latest_at")
+        for column in time_columns:
             if column in tables[name]:
-                tables[name][column] = pd.to_datetime(
-                    tables[name][column], errors="coerce", utc=True
-                )
+                tables[name][column] = to_fortaleza(tables[name][column])
     return tables
 
 
@@ -73,12 +77,10 @@ def load_gold(path: Path | None = None) -> dict[str, pd.DataFrame]:
 
     for table in tables.values():
         if "ingested_at" in table:
-            table["ingested_at"] = pd.to_datetime(
-                table["ingested_at"], errors="coerce", utc=True
-            )
+            table["ingested_at"] = to_fortaleza(table["ingested_at"])
     if "dim_video" in tables and "video_published_at" in tables["dim_video"]:
-        tables["dim_video"]["video_published_at"] = pd.to_datetime(
-            tables["dim_video"]["video_published_at"], errors="coerce", utc=True
+        tables["dim_video"]["video_published_at"] = to_fortaleza(
+            tables["dim_video"]["video_published_at"]
         )
     return tables
 
