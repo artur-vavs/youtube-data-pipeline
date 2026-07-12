@@ -38,6 +38,7 @@ disputa pelo mesmo dado nem conflito de escrita.
 """
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -83,6 +84,7 @@ SILVER_VIDEOS = SILVER_DIR / "videos.parquet"
 OBSERVABILITY_DIR = DATALAKE / "observability"
 PIPELINE_RUNS_PATH = OBSERVABILITY_DIR / "pipeline_runs.parquet"
 API_CALLS_PATH = OBSERVABILITY_DIR / "api_calls.parquet"
+OBSERVABILITY_DB_SCRIPT = Path(__file__).with_name("06_build_observability_db.py")
 
 
 # --------------------------------------------------------------------------- #
@@ -262,6 +264,17 @@ def _append_observability(
                 ignore_index=True,
             )
         calls_frame.to_parquet(API_CALLS_PATH, engine="fastparquet", index=False)
+
+    # O arquivo tem prefixo numerico por seguir a ordem didatica da pipeline;
+    # por isso ele e carregado pelo caminho, e nao por um import convencional.
+    spec = importlib.util.spec_from_file_location(
+        "build_observability_db", OBSERVABILITY_DB_SCRIPT
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Nao foi possivel carregar {OBSERVABILITY_DB_SCRIPT}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.build_database(run_record["finished_at"])
 
 
 # --------------------------------------------------------------------------- #

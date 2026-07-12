@@ -97,6 +97,10 @@ e para o mapa completo entre visuais e tabelas da camada gold.
 As execuções também alimentam `datalake/observability`, com histórico de status,
 duração, atualização dos dados, chamadas à API e erros detalhados. Essas
 informações estão disponíveis na aba **Observabilidade** do dashboard.
+O mesmo histórico é sincronizado automaticamente em
+`datalake/observability/observability.db`, nas tabelas `pipeline_runs`,
+`api_calls` e `layer_metrics`. Para reconstruir o banco a partir dos Parquets,
+execute `python data_collect/06_build_observability_db.py`.
 
 ### Execução de teste a cada 5 minutos
 
