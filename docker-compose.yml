@@ -22,7 +22,8 @@ services:
       dockerfile: pipeline/Dockerfile
     container_name: yt-watchlist-pipeline-prod
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       - PIPELINE_INTERVAL_MINUTES=20
     volumes:
