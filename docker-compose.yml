@@ -6,8 +6,8 @@ services:
       dockerfile: pipeline/Dockerfile
     container_name: yt-watchlist-pipeline-test
     env_file:
-      - .env
-      required: false
+      - path: .env
+        required: false
     environment:
       - PIPELINE_INTERVAL_MINUTES=5
     volumes:
