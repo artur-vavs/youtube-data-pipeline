@@ -71,12 +71,12 @@ def ranking_bar(data: pd.DataFrame, metric: str, title: str, selected_id: str) -
     st.altair_chart(chart, width="stretch")
 
 
-@st.cache_data(show_spinner="Carregando camada gold…")
+@st.cache_data(ttl=60, show_spinner="Carregando camada gold…")
 def cached_gold() -> dict[str, pd.DataFrame]:
     return load_gold()
 
 
-@st.cache_data(show_spinner="Carregando observabilidade…")
+@st.cache_data(ttl=60, show_spinner="Carregando observabilidade…")
 def cached_observability() -> dict[str, pd.DataFrame]:
     return load_observability()
 

@@ -990,11 +990,12 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     configured_interval = os.getenv("PIPELINE_INTERVAL_MINUTES")
+
     interval_minutes = (
-        args.interval_minutes
-        if args.interval_minutes is not None
-        else float(configured_interval) if configured_interval else None
-    )
+        float(configured_interval)
+        if configured_interval
+        else args.interval_minutes
+    ) 
     if interval_minutes is None:
         run_pipeline()
     else:
